@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kafe Sipariş Sistemi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        .menu-item {
+            cursor: pointer;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .menu-item:hover {
+            background-color: #e9ecef;
+        }
+        .menu-item.selected {
+            background-color: #cfe2ff;
+        }
+        .sepet {
+            position: sticky;
+            top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Kafe Sipariş Sistemi</h1>
+        
+        <!-- Masa Seçimi -->
+        <div class="row mb-4">
+            <div class="col">
+                <select id="masaSelect" class="form-select">
+                    <option value="">Masa Seçin</option>
+                    {% for i in range(1, 21) %}
+                    <option value="Masa {{i}}">Masa {{i}}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Menü -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Menü</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="menu">
+                            {% for urun, fiyat in menu.items() %}
+                            <div class="menu-item d-flex justify-content-between align-items-center" 
+                                 onclick="urunSec(this, '{{urun}}', {{fiyat}})">
+                                <span>{{urun}}</span>
+                                <span>{{fiyat}} ₺</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sepet -->
+            <div class="col-md-4">
+                <div class="card sepet">
+                    <div class="card-header">
+                        <h5 class="mb-0">Sepet</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="sepet"></div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <strong>Toplam:</strong>
+                            <span id="toplam">0 ₺</span>
+                        </div>
+                        <button onclick="siparisVer()" class="btn btn-primary w-100 mt-3">Sipariş Ver</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let sepet = [];
+        let toplam = 0;
+
+        function urunSec(element, urun, fiyat) {
+            element.classList.toggle('selected');
+            
+            const index = sepet.findIndex(item => item.urun === urun);
+            if (index === -1) {
+                sepet.push({urun, fiyat, adet: 1});
+            } else {
+                sepet.splice(index, 1);
+            }
+            
+            sepetGuncelle();
+        }
+
+        function sepetGuncelle() {
+            const sepetDiv = document.getElementById('sepet');
+            sepetDiv.innerHTML = '';
+            toplam = 0;
+
+            sepet.forEach(item => {
+                toplam += item.fiyat * item.adet;
+                sepetDiv.innerHTML += `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>${item.urun}</span>
+                        <div>
+                            <button onclick="adetGuncelle('${item.urun}', -1)" class="btn btn-sm btn-outline-secondary">-</button>
+                            <span class="mx-2">${item.adet}</span>
+                            <button onclick="adetGuncelle('${item.urun}', 1)" class="btn btn-sm btn-outline-secondary">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('toplam').textContent = `${toplam} ₺`;
+        }
+
+        function adetGuncelle(urun, deger) {
+            const item = sepet.find(i => i.urun === urun);
+            if (item) {
+                item.adet = Math.max(1, item.adet + deger);
+                sepetGuncelle();
+            }
+        }
+
+        function siparisVer() {
+            const masaNo = document.getElementById('masaSelect').value;
+            if (!masaNo) {
+                alert('Lütfen bir masa seçin!');
+                return;
+            }
+            if (sepet.length === 0) {
+                alert('Lütfen en az bir ürün seçin!');
+                return;
+            }
+
+            const siparisler = sepet.map(item => ({
+                urun: item.urun,
+                adet: item.adet
+            }));
+
+            fetch('/siparis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    masa_no: masaNo,
+                    siparisler: siparisler
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Siparişiniz alındı!');
+                    // Sepeti temizle
+                    sepet = [];
+                    sepetGuncelle();
+                    // Seçimleri kaldır
+                    document.querySelectorAll('.menu-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                }
+            })
+            .catch(error => {
+                alert('Bir hata oluştu!');
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html> 
